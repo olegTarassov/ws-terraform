@@ -1,43 +1,34 @@
 FROM registry.access.redhat.com/ubi8/ubi
 
-ARG tfver="0.11.10"
-ARG tgver="0.18.7"
+ARG tfver="0.15.5"
+ARG tgver="0.35.16"
 
-ENV TERRAGRUNT_DOWNLOAD /terraform_cache/
-ENV HOME /root
+ARG AWS_DEFAULT_REGION="us-east-1"
+ARG AWS_ACCESS_KEY_ID=""
+ARG AWS_SECRET_ACCESS_KEY=""
 
-# Install Packages
-RUN dnf install git python38 unzip gem vim bind-utils iputils diffutils -y \
+ENV AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+ENV TERRAGRUNT_DOWNLOAD="/terraform_cache/"
+ENV HOME="/root"
+
+# Install Packages and Terraform
+RUN dnf config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo \
+      && dnf -y install nano git python38 unzip vim bind-utils iputils diffutils dnf-plugins-core nmap-ncat iproute terraform-ls terraform-${tfver}-1 \
       && dnf clean all
 
 # bashrc
 COPY bashrc $HOME/.bashrc
 
-# Install awscli
-RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
-      && unzip awscliv2.zip \
-      && ./aws/install \
-      && rm -rf aws/ awscliv2.zip
-
-# Install terraform
-RUN git clone https://github.com/tfutils/tfenv.git $HOME/.tfenv \
-      && echo 'export PATH="$HOME/.tfenv/bin:$PATH"' >> $HOME/.bashrc \
-      && export PATH="$HOME/.tfenv/bin:$PATH" \
-      && tfenv install ${tfver} \
-      && tfenv use ${tfver}
+# Install aws cli v2
+RUN curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+        && unzip -q awscliv2.zip \
+        && ./aws/install
 
 # Install terragrunt
-RUN git clone https://github.com/cunymatthieu/tgenv.git $HOME/.tgenv \
-      && echo 'export PATH="$HOME/.tgenv/bin:$PATH"' >> $HOME/.bashrc \
-      && export PATH="$HOME/.tgenv/bin:$PATH" \
-      && tgenv install ${tgver} \
-      && tgenv use ${tgver}
-
-# install landscape
-RUN gem install terraform_landscape
+RUN curl -sL https://github.com/gruntwork-io/terragrunt/releases/download/v${tgver}/terragrunt_linux_amd64 -o /usr/bin/terragrunt \
+      && chmod +x /usr/bin/terragrunt
 
 WORKDIR /terraform
 
 ENTRYPOINT ["terraform"]
 CMD [--version]
-
